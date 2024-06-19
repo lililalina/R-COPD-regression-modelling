@@ -1,0 +1,764 @@
+---
+title: "Analysis-COPD"
+author: "Lina"
+date: "2024-05-29"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+############################################################## 
+# Housekeeping Use for All Analyses #
+##############################################################
+date() # Current system time and date. 
+Sys.time() # Current system time and date (redundant).
+R.version.string # R version and version release date.
+options(digits=6) # Confirm default digits.
+options(scipen=999)# Suppress scientific notation.
+options(width=60) # Confirm output width. 
+ls() # List all objects in the working # directory.
+rm(list = ls()) # CAUTION: Remove all files in the #working directory. If this action is not desired, use rm() one-by-one to remove the objectsthat are not needed.
+ls.str() # List all objects with finite detail.
+getwd() # Identify the current working directory
+setwd("C:/Users/linan/Documents/GitHub/project/R-project/model-prediction-for-copd") # Set to a new working directory. # Note the single forward slash and double # quotes. # This new directory should be the directory # where the data file is located, otherwise # the data file will not be found.
+getwd()# Confirm the working directory.
+list.files()# List files at the PC directory
+.libPaths()# Library pathname
+.Library# Library pathname.
+sessionInfo() # R version, locale, and packages.
+search()# Attached packages and objects.
+searchpaths() # Attached packages and objects.
+
+###############################################################
+```
+```{r}
+library(dplyr)
+library(Hmisc)
+library(gmodels)
+library(ggplot2)
+library(tidyverse)
+library(mctest)
+```
+
+MULTIVARIATE LINEAR REGRESSION MODEL
+
+The aim of this project is to predict the association of disease severity to quality of life in patients with COPD.
+
+Data consists of 101 observations with 24 variables measured.
+
+
+```{r}
+copd <- read.table(file="COPD_student_dataset.csv", header=TRUE, dec=".", sep = ",")
+```
+
+```{r}
+str(copd)
+```
+## Variables 
+
+Characters : Age, Gender, Pack History, Smoking
+Disease : COPDSeverity, CAT
+Walking ability : MWT1, MWT2, MWT1Best
+Lung function : FEV1, FEV1PRED, FVC, FVCPRED
+Anxiety&Depression : HAD
+QOL : SGRQ
+Comorbidities : Diabetes, Muscular, Hypertension, AtrialFib, IHD
+
+numeric : Age, PackHistory, FEV, FEV1PRED, FVC, FVCPRED, CAT, HAD, MWT1, MWT2, MWT1Best, SGRQ
+factor : Gender, COPDseverity, copd, smoking, Diabetes, Muscular, Hypertension, AtrialFib, IHD
+
+Change variable type :
+```{r}
+#Numeric data
+copd$AGE <- as.numeric(copd$AGE)
+copd$MWT1 <- as.numeric(copd$MWT1)
+copd$MWT2 <- as.numeric(copd$MWT2)
+copd$MWT1Best<-as.numeric(copd$MWT1Best)
+copd$FEV1PRED <- as.numeric(copd$FEV1PRED)
+copd$FVCPRED <- as.numeric(copd$FVCPRED)
+copd$CAT <- as.numeric(copd$CAT)
+```
+```{r}
+#Categorical cata
+copd$AGEquartiles <- as.factor(copd$AGEquartiles)
+copd$copd <- as.factor(copd$copd)
+copd$gender <- as.factor(copd$gender)
+copd$Diabetes <- as.factor(copd$Diabetes)
+copd$smoking <- as.factor(copd$smoking)
+copd$muscular <- as.factor(copd$muscular)
+copd$hypertension <- as.factor(copd$hypertension)
+copd$AtrialFib <- as.factor(copd$AtrialFib)
+copd$IHD <- as.factor(copd$IHD)
+```
+
+```{r}
+#Check each data types
+str(copd)
+```
+
+```{r}
+describe(copd)
+```
+
+There is no missing value found in the data
+
+Create variable comorbid
+
+```{r}
+comorbid <- length(copd$Diabetes) #create a variable with length similar with Diabetes variable
+comorbid[copd$Diabetes ==1 | copd$muscular == 1 | copd$hypertension ==1 | copd$AtrialFib ==1 | copd$IHD == 1] <- 1
+comorbid[is.na(comorbid)] <- 0
+comorbid <- factor(comorbid)
+```
+
+```{r}
+copd$comorbid <- comorbid
+```
+```{r}
+str(copd)
+```
+Check categorical variables using crosstable
+
+```{r}
+# Assuming 'cat_vars' contains the names of categorical variables
+cat_vars <- c("gender", "COPDSEVERITY", "copd", "smoking", "Diabetes", "muscular", "hypertension", "AtrialFib", "IHD","comorbid")  
+
+# Create repeated CrossTable for each categorical variable
+for(var in cat_vars) {
+  cat(sprintf("Variable: %s\n", var))  
+  cat_table <- CrossTable(copd[, var], prop.chisq = FALSE)
+  print(cat_table)
+}
+```
+
+
+Summary and histogram for numerical data
+
+```{r}
+num_var <- c("AGE", "PackHistory", "MWT1", "MWT2", "MWT1Best", "FEV1", "FEV1PRED", "FVC", "FVCPRED","CAT","HAD","SGRQ") 
+```
+```{r}
+summary(copd)
+```
+
+
+```{r}
+# Create repeated bar plots for each categorical variable
+for(var in num_var) {
+  hist(copd[[var]], main = paste("Histogram of", var), xlab = var)
+}
+```
+```{r}
+# Create repeated plots for each numerical variable
+for(var in num_var) {
+  plot(copd[[var]], main = paste("Plot of", var), xlab = "Index", ylab = var)
+}
+```
+We find a value that might be outlier in MWT1BEst with value= 699 and <150, previously CAT (>40), and HAD (>50)
+```{r}
+copd$CAT[copd$CAT>40] <- NA
+```
+
+```{r}
+summary(copd$MWT1Best)
+```
+```{r}
+subset(copd, MWT1Best>650)
+```
+```{r}
+subset(copd, MWT1Best<150)
+```
+```{r}
+subset(copd, HAD>50)
+```
+
+```{r}
+# Subset the rows based on the condition
+subset_copd <- copd[copd$MWT1Best < 650 & copd$MWT1Best > 150, ]
+subset_copd <- subset_copd[subset_copd$CAT<40,]
+subset_copd <- subset_copd[subset_copd$HAD<50,]
+
+# Check the dimensions of the subsetted data
+dim(subset_copd)
+summary(subset_copd)
+```
+
+
+Pairwise correlation
+
+```{r}
+my_data<-subset_copd[,c("AGE","PackHistory","FEV1","FEV1PRED","FVC","FVCPRED","MWT1","MWT2","MWT1Best","CAT","HAD","SGRQ")]
+cor_matrix <- cor(my_data, use = "complete.obs")
+```
+```{r}
+round(cor_matrix,4)
+```
+
+```{r}
+pairs(~AGE+PackHistory+FEV1+FEV1PRED+FVC+FVCPRED+MWT1+MWT2+MWT1Best+CAT+HAD+SGRQ, data=subset_copd, pch=20,cex=1)
+```
+```{r}
+num_vars1 <- c("AGE", "PackHistory", "MWT1", "MWT2", "MWT1Best") 
+num_vars2 <- c("FEV1", "FEV1PRED", "FVC", "FVCPRED")
+num_vars3 <- c("CAT","HAD","SGRQ")
+```
+
+```{r}
+# Create boxplots for each numerical variable
+par(mfrow = c(1, length(num_vars1)), mar = c(5, 4, 4, 2))  # Adjusting margins
+
+for(i in 1:length(num_vars1)) {
+  boxplot(subset_copd[[num_vars1[i]]], main = paste("Boxplot of", num_vars1[i]), 
+          ylab = num_vars1[i], col = "skyblue", border = "black")
+}
+
+par(mfrow = c(1, 1))  # Reset to single-panel plot
+```
+```{r}
+# Create boxplots for each numerical variable
+par(mfrow = c(1, length(num_vars2)), mar = c(5, 4, 4, 2))  # Adjusting margins
+
+for(i in 1:length(num_vars2)) {
+  boxplot(subset_copd[[num_vars2[i]]], main = paste("Boxplot of", num_vars2[i]), 
+          ylab = num_vars2[i], col = "skyblue", border = "black")
+}
+
+par(mfrow = c(1, 1))  # Reset to single-panel plot
+```
+```{r}
+# Create boxplots for each numerical variable
+par(mfrow = c(1, length(num_vars3)), mar = c(5, 4, 4, 2))  # Adjusting margins
+
+for(i in 1:length(num_vars3)) {
+  boxplot(subset_copd[[num_vars3[i]]], main = paste("Boxplot of", num_vars3[i]), 
+          ylab = num_vars3[i], col = "skyblue", border = "black")
+}
+
+par(mfrow = c(1, 1))  # Reset to single-panel plot
+```
+Impute more outliers
+```{r}
+# Subset the rows based on the condition
+subset_copd <- subset_copd[subset_copd$AGE>55 & subset_copd$AGE<85,]
+subset_copd <- subset_copd[subset_copd$PackHistory<95,]
+subset_copd <- na.omit(subset_copd)
+```
+
+```{r}
+# Create boxplots for each numerical variable
+par(mfrow = c(1, length(num_vars1)), mar = c(5, 4, 4, 2))  # Adjusting margins
+for(i in 1:length(num_vars1)) {
+  boxplot(subset_copd[[num_vars1[i]]], main = paste("Boxplot of", num_vars1[i]), 
+          ylab = num_vars1[i], col = "skyblue", border = "black")
+}
+par(mfrow = c(1, 1))  # Reset to single-panel plot
+```
+
+```{r}
+# Check the dimensions of the subsetted data
+dim(subset_copd)
+describe(subset_copd)
+summary(subset_copd)
+```
+
+```{r count mean and sd}
+# Initialize vectors to store results
+means <- numeric()
+stds <- numeric()
+
+# Loop through each column in subset_copd
+for (col in names(subset_copd)) {
+  # Check if the column is numeric
+  if (is.numeric(subset_copd[[col]])) {
+    # Calculate mean and standard deviation
+    mean_value <- mean(subset_copd[[col]])
+    sd_value <- sd(subset_copd[[col]])
+    
+    # Print or store results
+    cat("Column:", col,"\n")
+    cat("Mean:", mean_value, "\n")
+    cat("Standard deviation:", sd_value, "\n\n")
+    
+    # Store results in vectors
+    means <- c(means, mean_value)
+    stds <- c(stds, sd_value)
+  }
+}
+
+# Print overall means and standard deviations
+cat("Overall Means: \n")
+print(means)
+
+cat("Overall standard deviation: \n")
+print(stds)
+```
+
+
+
+```{r}
+cor_matrix <- cor(my_data, use = "complete.obs")
+round(cor_matrix,4)
+```
+```{r}
+pairs(~AGE+PackHistory+FEV1+FEV1PRED+FVC+FVCPRED+MWT1+MWT2+MWT1Best+CAT+HAD+SGRQ, data=subset_copd, pch=20,cex=0.8)
+```
+
+
+Dependent variable : SGRQ / Quality of Life
+Independet variable : AGE,PackHistory,FEV1,FVC,MWT1Best, CAT, HAD
+
+
+Linear regression model
+
+```{r}
+# List of independent variables (replace with your actual variable names)
+independent_vars <- c("AGE", "PackHistory", "FEV1", "FVC", "MWT1Best","CAT","HAD","gender","COPDSEVERITY","comorbid","Diabetes","hypertension","AtrialFib","IHD")
+
+# Dependent variable
+dependent_var <- "SGRQ"  # Replace with your dependent variable name
+
+# Perform linear regression for each independent variable
+for(var in independent_vars) {
+  formula <- paste(dependent_var, "~", var)
+  model <- lm(formula, data = subset_copd)
+  cat("Linear Regression Summary for", var, ":\n")
+  print(summary(model))
+  cat("\n")
+}
+```
+
+
+Variables which show significant correlation with SGRQ : FEV1, FVC, MWT1Best, CAT, HAD, COPDSeverity
+
+MULTIPLE LINEAR REGRESSION
+
+Include all variables
+
+```{r}
+sgrq_model <- lm(SGRQ~AGE+gender+FEV1+FVC+CAT+MWT1Best+COPDSEVERITY+HAD+comorbid, data=subset_copd)
+```
+
+```{r}
+summary(sgrq_model)
+```
+```{r}
+confint(sgrq_model)
+```
+Fit the model :
+```{r}
+predictedsgrqmodel1 <- predict(sgrq_model)
+residualsgrqmodel1 <- residuals(sgrq_model)
+```
+
+Check using plots :
+```{r}
+plot(sgrq_model)
+```
+```{r}
+imcdiag(sgrq_model)
+```
+```{r}
+imcdiag(sgrq_model, method = "VIF")
+```
+
+
+1. FEV1, FVC, CAT
+According to literature, these thre variables are assessment measured in patient with COPD. So I start the model with these variables.
+
+
+```{r}
+sgrq_model_1 <- lm(SGRQ~FEV1+FVC+CAT, data=subset_copd)
+```
+
+```{r}
+summary(sgrq_model_1)
+```
+Rsquared = 0.668
+F(3,92) = 40.3
+p-value = <0.0001
+
+```{r}
+confint(sgrq_model_1)
+```
+Fit the model :
+```{r}
+predictedsgrqmodel1 <- predict(sgrq_model_1)
+residualsgrqmodel1 <- residuals(sgrq_model_1)
+```
+
+Check using plots :
+```{r}
+plot(sgrq_model_1)
+```
+2. Let's include AGE, gender,comorbid and COPD Severity
+
+
+```{r}
+sgrq_model_2 <- lm(SGRQ~AGE+gender+COPDSEVERITY+FEV1+FVC+CAT+MWT1Best+comorbid, data=subset_copd)
+```
+
+```{r}
+summary(sgrq_model_2)
+```
+Rsquared = 0.702
+F(3,92) = 17.4
+p-value = <0.00001
+
+```{r}
+confint(sgrq_model_2)
+```
+Fit the model :
+```{r}
+predictedsgrqmodel2 <- predict(sgrq_model_2)
+residualsgrqmodel2 <- residuals(sgrq_model_2)
+```
+
+Check using plots :
+```{r}
+plot(sgrq_model_2)
+```
+Checking if there's any collinearity in the model
+
+```{r}
+imcdiag(sgrq_model_2)
+```
+```{r}
+imcdiag(sgrq_model_2, method="VIF")
+```
+```{r}
+imcdiag(sgrq_model_2, method="TOL")
+```
+```{r}
+imcdiag(sgrq_model_2, method="Wi")
+```
+```{r}
+imcdiag(sgrq_model_2, method="Leamer")
+```
+```{r}
+imcdiag(sgrq_model_2, method="CVIF")
+```
+```{r}
+imcdiag(sgrq_model_2, method="Klein")
+```
+```{r}
+imcdiag(sgrq_model_2, method="IND1")
+```
+```{r}
+imcdiag(sgrq_model_2, method="IND2")
+```
+Multicollinearity is detected in COPDSEVERITY, FEV1 and FVC variables
+
+3. Check if one of those variables are removed
+
+```{r}
+sgrq_model_3 <- lm(SGRQ~AGE+gender+FEV1+FVC+CAT+comorbid, data=subset_copd)
+```
+
+```{r}
+summary(sgrq_model_3)
+```
+```{r}
+confint(sgrq_model_3)
+```
+Fit the model :
+```{r}
+predictedsgrqmodel3 <- predict(sgrq_model_3)
+residualsgrqmodel3 <- residuals(sgrq_model_3)
+```
+
+Check using plots :
+```{r}
+plot(sgrq_model_3)
+```
+
+```{r}
+sgrq_model_4 <- lm(SGRQ~AGE+gender+COPDSEVERITY+FVC+CAT+comorbid, data=subset_copd)
+```
+
+```{r}
+summary(sgrq_model_4)
+```
+```{r}
+confint(sgrq_model_4)
+```
+Fit the model :
+```{r}
+predictedsgrqmodel4 <- predict(sgrq_model_4)
+residualsgrqmodel4 <- residuals(sgrq_model_4)
+```
+
+Check using plots :
+```{r}
+plot(sgrq_model_4)
+```
+
+```{r}
+sgrq_model_5 <- lm(SGRQ~AGE+gender+COPDSEVERITY+FEV1+CAT+comorbid, data=subset_copd)
+```
+
+```{r}
+summary(sgrq_model_5)
+```
+```{r}
+confint(sgrq_model_5)
+```
+Fit the model :
+```{r}
+predictedsgrqmodel5 <- predict(sgrq_model_5)
+residualsgrqmodel5 <- residuals(sgrq_model_5)
+```
+
+Check using plots :
+```{r}
+plot(sgrq_model_5)
+```
+
+```{r}
+sgrq_model_6 <- lm(SGRQ~AGE+gender+COPDSEVERITY+CAT+comorbid, data=subset_copd)
+```
+
+```{r}
+summary(sgrq_model_6)
+```
+```{r}
+confint(sgrq_model_6)
+```
+Fit the model :
+```{r}
+predictedsgrqmodel6 <- predict(sgrq_model_6)
+residualsgrqmodel6 <- residuals(sgrq_model_6)
+```
+
+Check using plots :
+```{r}
+plot(sgrq_model_6)
+```
+
+```{r}
+sgrq_model_7 <- lm(SGRQ~AGE+gender+FEV1+CAT+comorbid, data=subset_copd)
+```
+
+```{r}
+summary(sgrq_model_7)
+```
+```{r}
+confint(sgrq_model_7)
+```
+Fit the model :
+```{r}
+predictedsgrqmodel7 <- predict(sgrq_model_7)
+residualsgrqmodel7 <- residuals(sgrq_model_7)
+```
+
+Check using plots :
+```{r}
+plot(sgrq_model_7)
+```
+
+```{r}
+sgrq_model_8 <- lm(SGRQ~AGE+gender+FVC+CAT+comorbid, data=subset_copd)
+```
+
+```{r}
+summary(sgrq_model_8)
+```
+```{r}
+confint(sgrq_model_8)
+```
+Fit the model :
+```{r}
+predictedsgrqmodel8 <- predict(sgrq_model_8)
+residualsgrqmodel8 <- residuals(sgrq_model_8)
+```
+
+Check using plots :
+```{r}
+plot(sgrq_model_8)
+```
+```{r}
+pairs(~FEV1+FVC+CAT+SGRQ+HAD+MWT1Best, data=subset_copd, pch=20,cex=1)
+```
+According to correlation matrix above, it is found that FEV1 and FVC has quite high correlation with each other while their correlations with SGRQ are quite spurious. These are the explanation that previous models have collinearity with FEV1, FVC, and COPDSEVERITY. CAT and HAD are two variables which has better correlation with SGRQ. So,removing variables FEV1, FVC and COPDSEVERITY data and use CAT as the only predictor of lung function in COPD. 
+
+```{r}
+sgrq_model_9 <- lm(SGRQ~CAT+HAD, data=subset_copd)
+```
+
+```{r}
+summary(sgrq_model_9)
+```
+```{r}
+confint(sgrq_model_9)
+```
+Fit the model :
+```{r}
+predictedsgrqmodel9 <- predict(sgrq_model_9)
+residualsgrqmodel9 <- residuals(sgrq_model_9)
+```
+
+Check using plots :
+```{r}
+plot(sgrq_model_9)
+```
+After removing FEV1, FVC, and COPD Severity predictors, it is found that the multiple Rsquared is improving to 0.681 with significancy <0.00001. Moreover, significancy of CAT and HAD retained with value <0.05.
+
+```{r}
+sgrq_model_10 <- lm(SGRQ~CAT+HAD+MWT1Best, data=subset_copd)
+```
+
+```{r}
+summary(sgrq_model_10)
+```
+```{r}
+confint(sgrq_model_10)
+```
+Fit the model :
+```{r}
+predictedsgrqmodel10 <- predict(sgrq_model_10)
+residualsgrqmodel10 <- residuals(sgrq_model_10)
+```
+
+Check using plots :
+```{r}
+plot(sgrq_model_10)
+```
+
+Exploring the effect of categorical variables
+
+gender,comorbid, Diabetes, IHD, AtrialFib, hypertension
+
+```{r}
+mlr1 <- lm(SGRQ~CAT+HAD+AGE+gender, data=subset_copd)
+```
+
+```{r}
+summary(mlr1)
+```
+```{r}
+confint(mlr1)
+```
+fit the model :
+```{r}
+predictedsgrqmodel9 <- predict(mlr1)
+residualsgrqmodel9 <- residuals(mlr1)
+```
+
+Check using plots :
+```{r}
+plot(mlr1)
+```
+
+Adding gender in the model doesn't change much in value of multiple R-squared and p-value. Gender is not significant predictor to SGRQ.
+
+```{r}
+mlr2 <- lm(SGRQ~CAT+HAD+AGE+gender+comorbid, data=subset_copd)
+```
+
+```{r}
+summary(mlr2)
+```
+```{r}
+confint(mlr2)
+```
+it the model :
+```{r}
+predictedsgrqmodel9 <- predict(mlr2)
+residualsgrqmodel9 <- residuals(mlr2)
+```
+
+Check using plots :
+```{r}
+plot(mlr2)
+```
+
+```{r}
+mlr3 <- lm(SGRQ~CAT+HAD+AGE+MWT1Best+gender+comorbid+Diabetes+hypertension+AtrialFib+IHD, data=subset_copd)
+```
+
+```{r}
+summary(mlr3)
+```
+```{r}
+confint(mlr3)
+```
+Adding all comorbidities, the Rsquared value increased to 0.703 and Diabetes and hypertension are two predictors that said dignificant.
+
+Fit the model :
+```{r}
+predictedmlr3 <- predict(mlr3)
+residualsmlr3 <- residuals(mlr3)
+```
+
+Check using plots :
+```{r}
+plot(mlr3)
+```
+```{r}
+imcdiag(mlr3)
+```
+
+
+Despite increase in multiple R-squared, the residual plot shows overfitting which means the model catch noise in the data. 
+
+```{r}
+mlr4 <- lm(SGRQ~CAT+HAD+AGE+MWT1Best+gender+Diabetes+hypertension, data=subset_copd)
+```
+
+```{r}
+summary(mlr4)
+```
+```{r}
+confint(mlr4)
+```
+Adding all comorbidities, the Rsquared value increased to 0.7 and no significant categorical predictor. 
+
+Fit the model :
+```{r}
+predictedmlr4 <- predict(mlr4)
+residualsmlr4 <- residuals(mlr4)
+```
+
+Check using plots :
+```{r}
+plot(mlr4)
+```
+```{r}
+mlr5 <- lm(SGRQ~CAT+HAD+AGE+gender+Diabetes*hypertension, data=subset_copd)
+```
+
+```{r}
+summary(mlr5)
+```
+```{r}
+confint(mlr5)
+```
+
+Fit the model :
+```{r}
+predictedmlr4 <- predict(mlr5)
+residualsmlr4 <- residuals(mlr5)
+```
+
+Check using plots :
+```{r}
+plot(mlr5)
+```
+```{r}
+imcdiag(mlr5)
+```
+```{r}
+imcdiag(mlr5, method="VIF")
+```
+
+
