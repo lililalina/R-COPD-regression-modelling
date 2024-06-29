@@ -31,7 +31,7 @@ ls() # List all objects in the working # directory.
 rm(list = ls()) # CAUTION: Remove all files in the #working directory. If this action is not desired, use rm() one-by-one to remove the objectsthat are not needed.
 ls.str() # List all objects with finite detail.
 getwd() # Identify the current working directory
-setwd("C:/Users/linan/Documents/GitHub/project/R-project/model-prediction-for-copd") # Set to a new working directory. # Note the single forward slash and double # quotes. # This new directory should be the directory # where the data file is located, otherwise # the data file will not be found.
+setwd("C:/Users/linan/Documents/GitHub/R-COPD-regression-modelling") # Set to a new working directory. # Note the single forward slash and double # quotes. # This new directory should be the directory # where the data file is located, otherwise # the data file will not be found.
 getwd()# Confirm the working directory.
 list.files()# List files at the PC directory
 .libPaths()# Library pathname
@@ -42,28 +42,34 @@ searchpaths() # Attached packages and objects.
 
 ###############################################################
 ```
+
+
 ```{r}
+## Libraries
 library(dplyr)
 library(Hmisc)
 library(gmodels)
 library(ggplot2)
 library(tidyverse)
 library(mctest)
+library(DataExplorer) # for EDA
 ```
 
 MULTIVARIATE LINEAR REGRESSION MODEL
 
-The aim of this project is to predict the association of disease severity to quality of life in patients with COPD.
+Aim : to predict the factors associated to quality of life in patients with COPD.
 
 Data consists of 101 observations with 24 variables measured.
 
-
 ```{r}
+# import data
 copd <- read.table(file="COPD_student_dataset.csv", header=TRUE, dec=".", sep = ",")
 ```
 
 ```{r}
+# Data exploration 
 str(copd)
+head(copd)
 ```
 ## Variables 
 
@@ -108,14 +114,19 @@ str(copd)
 ```
 
 ```{r}
-describe(copd)
+plot_intro(copd)
 ```
+```{r}
+#Missing value
+plot_missing(copd, group=c("Good"=1.0), theme_config=list(text = element_text(size = 16)))
+```
+
 
 There is no missing value found in the data
 
-Create variable comorbid
 
 ```{r}
+# Create variable comorbid
 comorbid <- length(copd$Diabetes) #create a variable with length similar with Diabetes variable
 comorbid[copd$Diabetes ==1 | copd$muscular == 1 | copd$hypertension ==1 | copd$AtrialFib ==1 | copd$IHD == 1] <- 1
 comorbid[is.na(comorbid)] <- 0
@@ -130,7 +141,15 @@ str(copd)
 ```
 Check categorical variables using crosstable
 
+
 ```{r}
+# bar charts of discrete features
+plot_bar(copd)
+```
+
+```{r}
+#Crosstabs of categorical data
+
 # Assuming 'cat_vars' contains the names of categorical variables
 cat_vars <- c("gender", "COPDSEVERITY", "copd", "smoking", "Diabetes", "muscular", "hypertension", "AtrialFib", "IHD","comorbid")  
 
@@ -148,6 +167,17 @@ Summary and histogram for numerical data
 ```{r}
 num_var <- c("AGE", "PackHistory", "MWT1", "MWT2", "MWT1Best", "FEV1", "FEV1PRED", "FVC", "FVCPRED","CAT","HAD","SGRQ") 
 ```
+
+```{r}
+# use dlookr to examine outliers
+library(dlookr)
+plot_outlier(copd,
+             diagnose_outlier(copd) %>%
+                filter(outliers_cnt > 0) %>%
+                select(variables) %>%
+                unlist())
+```
+
 ```{r}
 summary(copd)
 ```
@@ -157,12 +187,6 @@ summary(copd)
 # Create repeated bar plots for each categorical variable
 for(var in num_var) {
   hist(copd[[var]], main = paste("Histogram of", var), xlab = var)
-}
-```
-```{r}
-# Create repeated plots for each numerical variable
-for(var in num_var) {
-  plot(copd[[var]], main = paste("Plot of", var), xlab = "Index", ylab = var)
 }
 ```
 We find a value that might be outlier in MWT1BEst with value= 699 and <150, previously CAT (>40), and HAD (>50)
@@ -266,7 +290,7 @@ par(mfrow = c(1, 1))  # Reset to single-panel plot
 ```
 
 ```{r}
-# Check the dimensions of the subsetted data
+# Check the dimensions of the subset data
 dim(subset_copd)
 describe(subset_copd)
 summary(subset_copd)
@@ -319,11 +343,12 @@ Dependent variable : SGRQ / Quality of Life
 Independet variable : AGE,PackHistory,FEV1,FVC,MWT1Best, CAT, HAD
 
 
+
 Linear regression model
 
 ```{r}
 # List of independent variables (replace with your actual variable names)
-independent_vars <- c("AGE", "PackHistory", "FEV1", "FVC", "MWT1Best","CAT","HAD","gender","COPDSEVERITY","comorbid","Diabetes","hypertension","AtrialFib","IHD")
+independent_vars <- c("AGE", "PackHistory", "FEV1", "FVC", "MWT1Best","CAT","HAD","gender","COPDSEVERITY","comorbid","Diabetes","hypertension","muscular","AtrialFib","IHD","smoking")
 
 # Dependent variable
 dependent_var <- "SGRQ"  # Replace with your dependent variable name
@@ -334,6 +359,8 @@ for(var in independent_vars) {
   model <- lm(formula, data = subset_copd)
   cat("Linear Regression Summary for", var, ":\n")
   print(summary(model))
+  cat("95% CI", var, ":\n")
+  print(confint(model))
   cat("\n")
 }
 ```
@@ -346,7 +373,7 @@ MULTIPLE LINEAR REGRESSION
 Include all variables
 
 ```{r}
-sgrq_model <- lm(SGRQ~AGE+gender+FEV1+FVC+CAT+MWT1Best+COPDSEVERITY+HAD+comorbid, data=subset_copd)
+sgrq_model <- lm(SGRQ~AGE+gender+FEV1+FVC+CAT+MWT1Best+COPDSEVERITY+HAD+comorbid+smoking+Diabetes+hypertension+muscular+AtrialFib+IHD, data=subset_copd)
 ```
 
 ```{r}
@@ -757,8 +784,6 @@ plot(mlr5)
 ```{r}
 imcdiag(mlr5)
 ```
-```{r}
-imcdiag(mlr5, method="VIF")
-```
+
 
 
