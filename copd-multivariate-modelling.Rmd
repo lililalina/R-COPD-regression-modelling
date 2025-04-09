@@ -55,7 +55,7 @@ library(mctest)
 library(DataExplorer) # for EDA
 ```
 
-MULTIVARIATE LINEAR REGRESSION MODEL
+#MULTIVARIATE LINEAR REGRESSION MODEL
 
 Aim : to predict the factors associated to quality of life in patients with COPD.
 
@@ -84,7 +84,7 @@ Comorbidities : Diabetes, Muscular, Hypertension, AtrialFib, IHD
 numeric : Age, PackHistory, FEV, FEV1PRED, FVC, FVCPRED, CAT, HAD, MWT1, MWT2, MWT1Best, SGRQ
 factor : Gender, COPDseverity, copd, smoking, Diabetes, Muscular, Hypertension, AtrialFib, IHD
 
-Change variable type :
+###Change variable type :
 ```{r}
 #Numeric data
 copd$AGE <- as.numeric(copd$AGE)
@@ -121,7 +121,6 @@ plot_intro(copd)
 plot_missing(copd, group=c("Good"=1.0), theme_config=list(text = element_text(size = 16)))
 ```
 
-
 There is no missing value found in the data
 
 
@@ -139,17 +138,15 @@ copd$comorbid <- comorbid
 ```{r}
 str(copd)
 ```
-Check categorical variables using crosstable
-
+###Summary categorical variables using crosstable
 
 ```{r}
 # bar charts of discrete features
 plot_bar(copd)
 ```
 
-```{r}
+```{r create repeated crosstable for categorical data}
 #Crosstabs of categorical data
-
 # Assuming 'cat_vars' contains the names of categorical variables
 cat_vars <- c("gender", "COPDSEVERITY", "copd", "smoking", "Diabetes", "muscular", "hypertension", "AtrialFib", "IHD","comorbid")  
 
@@ -161,14 +158,13 @@ for(var in cat_vars) {
 }
 ```
 
-
-Summary and histogram for numerical data
+##Summary and histogram for numerical data
 
 ```{r}
 num_var <- c("AGE", "PackHistory", "MWT1", "MWT2", "MWT1Best", "FEV1", "FEV1PRED", "FVC", "FVCPRED","CAT","HAD","SGRQ") 
 ```
 
-```{r}
+```{r examine outlier dlookr}
 # use dlookr to examine outliers
 library(dlookr)
 plot_outlier(copd,
@@ -184,12 +180,13 @@ summary(copd)
 
 
 ```{r}
-# Create repeated bar plots for each categorical variable
+# histogram of numeric variables
 for(var in num_var) {
   hist(copd[[var]], main = paste("Histogram of", var), xlab = var)
 }
 ```
-We find a value that might be outlier in MWT1BEst with value= 699 and <150, previously CAT (>40), and HAD (>50)
+We find a value that might be outlier in :
+MWT1Best with value= 699 and <150, previously CAT (>40), and HAD (>50)
 ```{r}
 copd$CAT[copd$CAT>40] <- NA
 ```
@@ -206,7 +203,7 @@ subset(copd, MWT1Best<150)
 ```{r}
 subset(copd, HAD>50)
 ```
-
+Removing the outliers in the dataset
 ```{r}
 # Subset the rows based on the condition
 subset_copd <- copd[copd$MWT1Best < 650 & copd$MWT1Best > 150, ]
@@ -219,7 +216,7 @@ summary(subset_copd)
 ```
 
 
-Pairwise correlation
+### Pairwise correlation
 
 ```{r}
 my_data<-subset_copd[,c("AGE","PackHistory","FEV1","FEV1PRED","FVC","FVCPRED","MWT1","MWT2","MWT1Best","CAT","HAD","SGRQ")]
@@ -295,6 +292,20 @@ dim(subset_copd)
 describe(subset_copd)
 summary(subset_copd)
 ```
+### pairwise correlation after imputation
+
+```{r}
+cor_matrix <- cor(my_data, use = "complete.obs")
+
+round(cor_matrix,4)
+```
+```{r}
+pairs(~AGE+PackHistory+FEV1+FEV1PRED+FVC+FVCPRED+MWT1+MWT2+MWT1Best+CAT+HAD+SGRQ, data=subset_copd, pch=20,cex=1)
+```
+```{r}
+pairs(~AGE+FEV1+FVC+MWT1Best+CAT+HAD+SGRQ, data=subset_copd, pch=20,cex=1)
+```
+
 
 ```{r count mean and sd}
 # Initialize vectors to store results
@@ -329,22 +340,11 @@ print(stds)
 ```
 
 
-
-```{r}
-cor_matrix <- cor(my_data, use = "complete.obs")
-round(cor_matrix,4)
-```
-```{r}
-pairs(~AGE+PackHistory+FEV1+FEV1PRED+FVC+FVCPRED+MWT1+MWT2+MWT1Best+CAT+HAD+SGRQ, data=subset_copd, pch=20,cex=0.8)
-```
-
-
 Dependent variable : SGRQ / Quality of Life
 Independet variable : AGE,PackHistory,FEV1,FVC,MWT1Best, CAT, HAD
 
 
-
-Linear regression model
+## LINEAR REGRESSION MODEL - Univariate analysis
 
 ```{r}
 # List of independent variables (replace with your actual variable names)
@@ -368,7 +368,7 @@ for(var in independent_vars) {
 
 Variables which show significant correlation with SGRQ : FEV1, FVC, MWT1Best, CAT, HAD, COPDSeverity
 
-MULTIPLE LINEAR REGRESSION
+## MULTIPLE LINEAR REGRESSION - MUltivariate variable
 
 Include all variables
 
@@ -395,13 +395,17 @@ plot(sgrq_model)
 ```{r}
 imcdiag(sgrq_model)
 ```
+Notes : 
+VIF > 10 → Severe multicollinearity.
+VIF between 5-10 → Moderate multicollinearity.
+VIF < 5 → Acceptable levels.
 ```{r}
 imcdiag(sgrq_model, method = "VIF")
 ```
 
 
 1. FEV1, FVC, CAT
-According to literature, these thre variables are assessment measured in patient with COPD. So I start the model with these variables.
+According to literature, these three variables are assessment measured in patient with COPD. So I start the model with these variables.
 
 
 ```{r}
@@ -427,6 +431,9 @@ residualsgrqmodel1 <- residuals(sgrq_model_1)
 Check using plots :
 ```{r}
 plot(sgrq_model_1)
+```
+```{r}
+imcdiag(sgrq_model_1)
 ```
 2. Let's include AGE, gender,comorbid and COPD Severity
 
