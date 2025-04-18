@@ -775,7 +775,7 @@ plot(mlr4)
 ##multivariate model 5
 
 ```{r}
-mlr5 <- lm(SGRQ~CAT+HAD+AGE+gender+Diabetes*hypertension, data=subset_copd)
+mlr5 <- lm(SGRQ~CAT+HAD+AGE+gender+comorbid, data=subset_copd)
 ```
 
 ```{r}
@@ -787,8 +787,8 @@ confint(mlr5)
 
 Fit the model :
 ```{r}
-predictedmlr4 <- predict(mlr5)
-residualsmlr4 <- residuals(mlr5)
+predictedmlr5 <- predict(mlr5)
+residualsmlr5 <- residuals(mlr5)
 ```
 
 Check using plots :
@@ -806,4 +806,16 @@ mlr6 <- lm(SGRQ~CAT+HAD+AGE+FEV1+gender+comorbid, data=subset_copd)
 ```{r}
 summary(mlr6)
 ```
+```{r}
+confint(mlr6)
+```
+Fit the model :
+```{r}
+predictedmlr6 <- predict(mlr6)
+residualsmlr6 <- residuals(mlr6)
+```
 
+Check using plots :
+```{r}
+plot(mlr6)
+```
