@@ -186,7 +186,11 @@ for(var in num_var) {
 }
 ```
 We find a value that might be outlier in :
-MWT1Best with value= 699 and <150, previously CAT (>40), and HAD (>50)
+
+MWT1Best with value= 699 and <150, 
+previously CAT (>40), and 
+HAD (>50)
+
 ```{r}
 copd$CAT[copd$CAT>40] <- NA
 ```
@@ -203,6 +207,7 @@ subset(copd, MWT1Best<150)
 ```{r}
 subset(copd, HAD>50)
 ```
+
 Removing the outliers in the dataset
 ```{r}
 # Subset the rows based on the condition
@@ -767,6 +772,8 @@ Check using plots :
 ```{r}
 plot(mlr4)
 ```
+##multivariate model 5
+
 ```{r}
 mlr5 <- lm(SGRQ~CAT+HAD+AGE+gender+Diabetes*hypertension, data=subset_copd)
 ```
@@ -792,5 +799,11 @@ plot(mlr5)
 imcdiag(mlr5)
 ```
 
+```{r}
+mlr6 <- lm(SGRQ~CAT+HAD+AGE+FEV1+gender+comorbid, data=subset_copd)
+```
 
+```{r}
+summary(mlr6)
+```
 
